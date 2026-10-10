@@ -1,0 +1,6 @@
+{
+  "name": "BizzNova — AI Startup Intelligence Platform",
+  "description": "AI-Powered Startup Intelligence, Validation, Business Modeling, MVP Planning & Growth Operating System.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
