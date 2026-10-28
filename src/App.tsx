@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
@@ -7,6 +8,9 @@ import { ToastContainer } from './components/common/ToastContainer';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
+import { LoginPage } from './pages/LoginPage';
+import { SignupPage } from './pages/SignupPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MyStartupPage } from './pages/MyStartupPage';
 import { AiInsightsPage } from './pages/AiInsightsPage';
@@ -24,10 +28,92 @@ import { FundingReadinessPage } from './pages/FundingReadinessPage';
 import { NetworkCommunityPage } from './pages/NetworkCommunityPage';
 import { LegalGuidancePage } from './pages/LegalGuidancePage';
 import { AdminPage } from './pages/AdminPage';
+import { AccountSettingsPage } from './pages/AccountSettingsPage';
 
 const AppContent: React.FC = () => {
-  const { activeTab } = useApp();
+  const { activeTab, setActiveTab, userRole, setUserRole } = useApp();
+  const { user, profile, isLoading, isRecoveryMode } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Sync role from Supabase profile whenever profile is loaded / changes
+  useEffect(() => {
+    if (profile?.role && profile.role !== userRole) {
+      setUserRole(profile.role);
+    }
+  }, [profile?.role, userRole, setUserRole]);
+
+  // Authentication Route Guards
+  useEffect(() => {
+    if (isLoading) return;
+
+    // 1. If password recovery mode is detected, navigate to reset password
+    if (isRecoveryMode && activeTab !== 'reset-password') {
+      setActiveTab('reset-password');
+      return;
+    }
+
+    // 2. If authenticated user tries to open login or signup, redirect to dashboard
+    if (user && ['login', 'signup'].includes(activeTab)) {
+      setActiveTab('dashboard');
+      return;
+    }
+
+    // 3. Admin Route Protection: Never let non-admins access admin panel
+    const effectiveRole = profile?.role || userRole;
+    if (activeTab === 'admin' && effectiveRole !== 'ADMIN') {
+      setActiveTab('dashboard');
+      return;
+    }
+
+    // 4. Account Settings Route Protection: If not logged in, redirect to login
+    if (!user && activeTab === 'account-settings') {
+      setActiveTab('login');
+      return;
+    }
+  }, [user, profile, userRole, isLoading, isRecoveryMode, activeTab, setActiveTab]);
+
+  // Loading Screen
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#03050e] flex items-center justify-center cyber-grid text-slate-100">
+        <div className="flex flex-col items-center gap-4 text-center px-4">
+          <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-purple-600 flex items-center justify-center shadow-[0_0_25px_rgba(56,189,248,0.6)]">
+            <span className="text-white font-bold text-lg">BN</span>
+            <div className="absolute inset-0 rounded-2xl bg-cyan-400 opacity-40 blur-[6px] animate-pulse" />
+          </div>
+          <div className="space-y-1">
+            <div className="text-sm font-bold text-white tracking-wide">BizzNova</div>
+            <div className="flex items-center justify-center gap-2 text-cyan-400 font-mono text-xs">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <span>Initializing Founder OS...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Standalone Fullscreen Public Views
+  if (isRecoveryMode || activeTab === 'reset-password') {
+    return (
+      <>
+        <ResetPasswordPage />
+        <ToastContainer />
+      </>
+    );
+  }
+
+  if (['landing', 'login', 'signup'].includes(activeTab)) {
+    return (
+      <>
+        {activeTab === 'landing' && <LandingPage />}
+        {activeTab === 'login' && <LoginPage />}
+        {activeTab === 'signup' && <SignupPage />}
+        <StartupModal />
+        <ToastContainer />
+      </>
+    );
+  }
 
   const renderActivePage = () => {
     switch (activeTab) {
@@ -73,6 +159,8 @@ const AppContent: React.FC = () => {
         return <LegalGuidancePage />;
       case 'admin':
         return <AdminPage />;
+      case 'account-settings':
+        return <AccountSettingsPage />;
       default:
         return <DashboardPage />;
     }
@@ -101,7 +189,7 @@ const AppContent: React.FC = () => {
 
         <footer className="border-t border-cyan-500/15 px-6 py-4 text-center text-xs text-slate-400 font-mono bg-[#030612]/60 backdrop-blur-md">
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className="text-cyan-400 font-bold">BizNova</span>
+            <span className="text-cyan-400 font-bold">BizzNova</span>
             <span>·</span>
             <span>AI Founder Operating System</span>
             <span>·</span>
@@ -121,8 +209,10 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </AuthProvider>
   );
 }

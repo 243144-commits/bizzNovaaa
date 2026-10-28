@@ -1,5 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { UserRole } from '../../types';
 import {
   LayoutDashboard,
   Building2,
@@ -24,6 +26,8 @@ import {
   ChevronRight,
   Globe,
   Zap,
+  LogOut,
+  LogIn,
 } from 'lucide-react';
 
 interface NavSection {
@@ -34,6 +38,7 @@ interface NavSection {
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
     adminOnly?: boolean;
+    allowedRoles?: UserRole[];
   }>;
 }
 
@@ -41,7 +46,8 @@ export const Sidebar: React.FC<{ isOpenMobile: boolean; onCloseMobile: () => voi
   isOpenMobile,
   onCloseMobile,
 }) => {
-  const { activeTab, setActiveTab, userRole, activeStartup } = useApp();
+  const { activeTab, setActiveTab, userRole, activeStartup, addToast } = useApp();
+  const { user, profile, signOut } = useAuth();
 
   const navSections: NavSection[] = [
     {
@@ -49,55 +55,153 @@ export const Sidebar: React.FC<{ isOpenMobile: boolean; onCloseMobile: () => voi
       items: [
         { id: 'landing', label: 'Cinematic Landing', icon: Globe, badge: 'New' },
         { id: 'dashboard', label: 'Founder Dashboard', icon: LayoutDashboard },
-        { id: 'my-startup', label: 'Venture Profile', icon: Building2 },
-        { id: 'ai-insights', label: 'AI Intelligence Feed', icon: Sparkles, badge: 'Live' },
+        {
+          id: 'my-startup',
+          label: 'Venture Profile',
+          icon: Building2,
+          allowedRoles: ['FOUNDER', 'TEAM_MEMBER', 'ADMIN'],
+        },
+        {
+          id: 'ai-insights',
+          label: 'AI Intelligence Feed',
+          icon: Sparkles,
+          badge: 'Live',
+          allowedRoles: ['FOUNDER', 'MENTOR', 'ADMIN'],
+        },
       ],
     },
     {
       title: 'VALIDATE & RESEARCH',
       items: [
-        { id: 'idea-analyzer', label: 'Idea Analyzer', icon: Lightbulb, badge: 'Core' },
-        { id: 'market-validation', label: 'Market Validation', icon: CheckCircle2 },
-        { id: 'competitors', label: 'Competitor Intelligence', icon: Users2 },
-        { id: 'customer-personas', label: 'Customer Personas', icon: Users2 },
-        { id: 'opportunity-radar', label: 'Opportunity & Risk Radar', icon: Radar },
+        {
+          id: 'idea-analyzer',
+          label: 'Idea Analyzer',
+          icon: Lightbulb,
+          badge: 'Core',
+          allowedRoles: ['FOUNDER', 'MENTOR', 'ADMIN'],
+        },
+        {
+          id: 'market-validation',
+          label: 'Market Validation',
+          icon: CheckCircle2,
+          allowedRoles: ['FOUNDER', 'MENTOR', 'ADMIN'],
+        },
+        {
+          id: 'competitors',
+          label: 'Competitor Intelligence',
+          icon: Users2,
+          allowedRoles: ['FOUNDER', 'INVESTOR', 'ADMIN'],
+        },
+        {
+          id: 'customer-personas',
+          label: 'Customer Personas',
+          icon: Users2,
+          allowedRoles: ['FOUNDER', 'MENTOR', 'ADMIN'],
+        },
+        {
+          id: 'opportunity-radar',
+          label: 'Opportunity & Risk Radar',
+          icon: Radar,
+          allowedRoles: ['FOUNDER', 'INVESTOR', 'ADMIN'],
+        },
       ],
     },
     {
       title: 'BUILD & EXECUTE',
       items: [
-        { id: 'business-model', label: 'Revenue Simulator', icon: Calculator },
-        { id: 'mvp-builder', label: 'MVP Builder & Roadmap', icon: Hammer },
-        { id: 'tasks', label: 'Sprint Tasks & Milestones', icon: ListTodo },
+        {
+          id: 'business-model',
+          label: 'Revenue Simulator',
+          icon: Calculator,
+          allowedRoles: ['FOUNDER', 'INVESTOR', 'ADMIN'],
+        },
+        {
+          id: 'mvp-builder',
+          label: 'MVP Builder & Roadmap',
+          icon: Hammer,
+          allowedRoles: ['FOUNDER', 'TEAM_MEMBER', 'ADMIN'],
+        },
+        {
+          id: 'tasks',
+          label: 'Sprint Tasks & Milestones',
+          icon: ListTodo,
+          allowedRoles: ['FOUNDER', 'TEAM_MEMBER', 'ADMIN'],
+        },
       ],
     },
     {
       title: 'GROW & DIAGNOSE',
       items: [
-        { id: 'growth-analytics', label: 'Growth Analytics', icon: TrendingUp },
-        { id: 'startup-health', label: 'Startup Health Engine', icon: Activity },
-        { id: 'failure-diagnosis', label: 'Failure Diagnosis', icon: AlertTriangle },
+        {
+          id: 'growth-analytics',
+          label: 'Growth Analytics',
+          icon: TrendingUp,
+          allowedRoles: ['FOUNDER', 'MENTOR', 'INVESTOR', 'ADMIN'],
+        },
+        {
+          id: 'startup-health',
+          label: 'Startup Health Engine',
+          icon: Activity,
+          allowedRoles: ['FOUNDER', 'INVESTOR', 'ADMIN'],
+        },
+        {
+          id: 'failure-diagnosis',
+          label: 'Failure Diagnosis',
+          icon: AlertTriangle,
+          allowedRoles: ['FOUNDER', 'MENTOR', 'ADMIN'],
+        },
       ],
     },
     {
       title: 'CAPITAL & FUNDING',
       items: [
-        { id: 'funding-readiness', label: 'Funding Readiness', icon: Coins },
-        { id: 'pitch-deck', label: 'Pitch Deck Assistant', icon: Presentation, badge: '12 Slides' },
+        {
+          id: 'funding-readiness',
+          label: 'Funding Readiness',
+          icon: Coins,
+          allowedRoles: ['FOUNDER', 'INVESTOR', 'ADMIN'],
+        },
+        {
+          id: 'pitch-deck',
+          label: 'Pitch Deck Assistant',
+          icon: Presentation,
+          badge: '12 Slides',
+          allowedRoles: ['FOUNDER', 'INVESTOR', 'ADMIN'],
+        },
       ],
     },
     {
       title: 'NETWORK & TALENT',
       items: [
-        { id: 'find-mentors', label: 'Find Mentors', icon: Compass },
-        { id: 'team-matching', label: 'Team Matching', icon: UserCheck },
-        { id: 'competitions', label: 'Competitions & Grants', icon: Trophy },
+        {
+          id: 'find-mentors',
+          label: 'Find Mentors',
+          icon: Compass,
+          allowedRoles: ['FOUNDER', 'MENTOR', 'ADMIN'],
+        },
+        {
+          id: 'team-matching',
+          label: 'Team Matching',
+          icon: UserCheck,
+          allowedRoles: ['FOUNDER', 'TEAM_MEMBER', 'MENTOR', 'ADMIN'],
+        },
+        {
+          id: 'competitions',
+          label: 'Competitions & Grants',
+          icon: Trophy,
+          allowedRoles: ['FOUNDER', 'INVESTOR', 'ADMIN'],
+        },
       ],
     },
     {
       title: 'GOVERNANCE',
       items: [
-        { id: 'legal-guidance', label: 'Legal Guidance', icon: Scale },
+        {
+          id: 'legal-guidance',
+          label: 'Legal Guidance',
+          icon: Scale,
+          allowedRoles: ['FOUNDER', 'ADMIN'],
+        },
       ],
     },
     {
@@ -154,8 +258,10 @@ export const Sidebar: React.FC<{ isOpenMobile: boolean; onCloseMobile: () => voi
         {/* Scrollable Nav Sections */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
           {navSections.map((section) => {
+            const effectiveRole: UserRole = (profile?.role as UserRole) || userRole;
             const visibleItems = section.items.filter((item) => {
-              if (item.adminOnly && userRole !== 'ADMIN') return false;
+              if (item.adminOnly && effectiveRole !== 'ADMIN') return false;
+              if (item.allowedRoles && !item.allowedRoles.includes(effectiveRole)) return false;
               return true;
             });
 
@@ -205,19 +311,64 @@ export const Sidebar: React.FC<{ isOpenMobile: boolean; onCloseMobile: () => voi
           })}
         </div>
 
-        {/* Bottom Workspace Status */}
-        <div className="p-3 border-t border-cyan-500/15 bg-[#05091c]/80 text-xs">
-          <div className="p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/20 shadow-sm">
-            <div className="flex items-center justify-between text-[11px] mb-1">
-              <span className="text-slate-400">System Core</span>
-              <span className="text-cyan-300 font-semibold font-mono flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                <span>ONLINE</span>
-              </span>
+        {/* Bottom Workspace Status & Auth */}
+        <div className="p-3 border-t border-cyan-500/15 bg-[#05091c]/80 text-xs space-y-2">
+          {user ? (
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-cyan-500/25 shadow-sm">
+              <div className="flex items-center justify-between text-[11px] mb-1.5">
+                <div className="flex items-center gap-2 truncate">
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center font-bold text-[9px] shrink-0">
+                    {(profile?.full_name || user.email || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <span className="font-semibold text-white truncate text-xs">
+                    {profile?.full_name || 'Founder'}
+                  </span>
+                </div>
+                <button
+                  onClick={async () => {
+                    await signOut();
+                    addToast({
+                      type: 'info',
+                      title: 'Signed Out',
+                      message: 'Session closed.',
+                    });
+                    setActiveTab('login');
+                  }}
+                  title="Sign out"
+                  className="text-slate-400 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-500/10 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="text-[10px] text-slate-400 truncate font-mono">
+                {user.email}
+              </div>
             </div>
-            <div className="text-[10px] text-slate-400 truncate font-mono">
-              Role: <span className="text-purple-300 font-bold">{userRole}</span> · {activeStartup.name}
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleSelectTab('login')}
+                className="flex-1 py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-300 text-center transition-colors cursor-pointer"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => handleSelectTab('signup')}
+                className="flex-1 py-1.5 px-2 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-[11px] font-mono text-cyan-200 text-center font-semibold transition-colors cursor-pointer"
+              >
+                Sign Up
+              </button>
             </div>
+          )}
+
+          <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 text-[10px] text-slate-400 truncate font-mono">
+            Role: <span className={`font-bold ${
+              (profile?.role || userRole) === 'ADMIN' ? 'text-rose-300' :
+              (profile?.role || userRole) === 'INVESTOR' ? 'text-emerald-300' :
+              (profile?.role || userRole) === 'MENTOR' ? 'text-purple-300' :
+              (profile?.role || userRole) === 'TEAM_MEMBER' ? 'text-blue-300' :
+              'text-cyan-300'
+            }`}>{profile?.role || userRole}</span> · {activeStartup.name}
           </div>
         </div>
       </aside>

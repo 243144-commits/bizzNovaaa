@@ -1,4 +1,5 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
+import type { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { GoogleGenAI } from '@google/genai';
@@ -11,33 +12,76 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(express.json());
 
-// Initialize server-side Gemini client
-const apiKey = process.env.GEMINI_API_KEY;
-let aiClient: GoogleGenAI | null = null;
-if (apiKey) {
-  try {
-    aiClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-    console.log('[BizzNova Backend] Google GenAI initialized successfully with gemini-3.8-flash');
-  } catch (err) {
-    console.error('[BizzNova Backend] Error initializing Google GenAI client:', err);
+// Dynamic server-side Gemini client helper
+let cachedAiClient: GoogleGenAI | null = null;
+let cachedApiKey: string | undefined = undefined;
+
+function getGeminiClient(): { client: GoogleGenAI | null; apiKey: string | undefined } {
+  const key = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+
+  if (!key) {
+    return { client: null, apiKey: undefined };
   }
-} else {
-  console.log('[BizzNova Backend] No GEMINI_API_KEY provided. Operating in deterministic high-fidelity engine mode.');
+
+  if (!cachedAiClient || cachedApiKey !== key) {
+    try {
+      cachedAiClient = new GoogleGenAI({
+        apiKey: key,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+      cachedApiKey = key;
+      console.log('[BizzNova Backend] Google GenAI initialized successfully with gemini-3.8-flash');
+    } catch (err) {
+      console.error('[BizzNova Backend] Error initializing Google GenAI client:', err);
+      return { client: null, apiKey: key };
+    }
+  }
+
+  return { client: cachedAiClient, apiKey: key };
+}
+
+// Resilient content generator with model fallback
+async function generateGeminiContent(
+  aiClient: GoogleGenAI,
+  prompt: string,
+  preferredModel = 'gemini-3.5-flash-lite'
+): Promise<{ text: string; modelUsed: string }> {
+  const models = [preferredModel, 'gemini-3.8-flash', 'gemini-flash-latest'];
+  let lastError: any = null;
+
+  for (const model of models) {
+    try {
+      const response = await aiClient.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      });
+      if (response.text) {
+        return { text: response.text, modelUsed: model };
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[BizzNova Backend] Model ${model} failed (${err?.message?.slice(0, 100) || err}), trying fallback model...`);
+    }
+  }
+
+  throw lastError;
 }
 
 // System Status Endpoint
 app.get('/api/system/status', (_req: Request, res: Response) => {
+  const { client, apiKey } = getGeminiClient();
   res.json({
     status: 'ONLINE',
     version: '1.0.0-bizznova',
-    aiProvider: aiClient ? 'Google Gemini (gemini-3.8-flash)' : 'Deterministic Startup Engine',
+    aiProvider: client ? 'Google Gemini (gemini-3.5-flash-lite / gemini-3.8-flash)' : 'Deterministic Startup Engine',
     hasApiKey: Boolean(apiKey),
     timestamp: new Date().toISOString(),
   });
@@ -53,6 +97,7 @@ app.post('/api/ai/analyze-idea', async (req: Request, res: Response) => {
   }
 
   // If Gemini API is configured, call gemini-3.8-flash
+  const { client: aiClient } = getGeminiClient();
   if (aiClient) {
     try {
       const prompt = `You are a world-class startup investor, accelerator partner, and product strategist.
@@ -114,16 +159,7 @@ Return valid JSON strictly matching this schema:
   ]
 }`;
 
-      const response = await aiClient.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.2,
-        },
-      });
-
-      const responseText = response.text;
+      const { text: responseText, modelUsed } = await generateGeminiContent(aiClient, prompt);
       if (responseText) {
         const parsed = JSON.parse(responseText.trim());
         res.json({
@@ -131,7 +167,7 @@ Return valid JSON strictly matching this schema:
           id: `analysis-${Date.now()}`,
           isAiGenerated: true,
           analyzedAt: new Date().toISOString(),
-          modelUsed: 'gemini-3.8-flash',
+          modelUsed,
           disclaimer: 'Preliminary AI assessment. Scores provide diagnostic guidance to test, not a guarantee of commercial success.',
         });
         return;
@@ -206,6 +242,7 @@ Return valid JSON strictly matching this schema:
 app.post('/api/ai/diagnose-failure', async (req: Request, res: Response) => {
   const { problemCategory, symptoms, startup } = req.body;
 
+  const { client: aiClient } = getGeminiClient();
   if (aiClient) {
     try {
       const prompt = `You are a veteran startup turnaround specialist.
@@ -237,17 +274,9 @@ Provide a structured, brutally honest diagnostic report in JSON:
   ]
 }`;
 
-      const response = await aiClient.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.2,
-        },
-      });
-
-      if (response.text) {
-        res.json(JSON.parse(response.text.trim()));
+      const { text: responseText } = await generateGeminiContent(aiClient, prompt);
+      if (responseText) {
+        res.json(JSON.parse(responseText.trim()));
         return;
       }
     } catch (e) {
@@ -348,7 +377,16 @@ async function startServer() {
   });
 }
 
+process.on('uncaughtException', (err) => {
+  console.error('[BizzNova Server] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[BizzNova Server] Unhandled Rejection:', reason);
+});
+
 startServer().catch((err) => {
   console.error('[BizzNova Server] Failed to start:', err);
   process.exit(1);
 });
+

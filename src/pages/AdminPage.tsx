@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import {
   ShieldCheck,
   AlertTriangle,
@@ -13,29 +14,28 @@ import {
 } from 'lucide-react';
 
 export const AdminPage: React.FC = () => {
-  const { userRole, setUserRole, startups, deleteStartup, resetToDemoDefaults, addToast } = useApp();
+  const { userRole, startups, deleteStartup, resetToDemoDefaults, addToast } = useApp();
+  const { profile, user } = useAuth();
 
   const [confirmReset, setConfirmReset] = useState(false);
 
-  if (userRole !== 'ADMIN') {
+  // Effective role: prefer Supabase profile role over local userRole
+  const effectiveRole = profile?.role || userRole;
+
+  if (effectiveRole !== 'ADMIN') {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
         <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-4">
           <Lock className="w-6 h-6" />
         </div>
         <h2 className="text-xl font-bold text-white mb-2">Restricted Administrator Area</h2>
-        <p className="text-xs text-slate-400 max-w-md mb-5">
-          Access to this console requires ADMIN role authorization. Switch your perspective to ADMIN to inspect diagnostics and manage platform state.
+        <p className="text-xs text-slate-400 max-w-md mb-2">
+          Access to this console requires <span className="text-rose-300 font-semibold">ADMIN</span> role authorization.
         </p>
-        <button
-          onClick={() => {
-            setUserRole('ADMIN');
-            addToast({ type: 'info', title: 'Role Switched to Administrator' });
-          }}
-          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md"
-        >
-          Authorize as Administrator
-        </button>
+        <p className="text-[11px] text-slate-500 font-mono max-w-xs">
+          Your current role is <span className="text-cyan-300 font-bold">{effectiveRole}</span>.
+          {user ? ' Contact an administrator to elevate your permissions.' : ' Sign in with an admin account to access this panel.'}
+        </p>
       </div>
     );
   }
